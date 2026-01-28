@@ -1,0 +1,128 @@
+PHASE A: MAKE IT PORTABLE (Executable)
+What “portable” realistically means (no sugarcoating)
+
+There are two levels:
+
+✅ Level 1 (Recommended, realistic)
+
+One folder
+
+Contains:
+
+.exe
+
+models (cached)
+
+Runs on any Windows PC without Python installed
+
+⚠️ Level 2 (Single-file EXE)
+
+Technically possible
+
+Very slow startup
+
+Huge file (3–4 GB)
+
+Debugging nightmare
+
+👉 We will do Level 1 (folder-based portable app)
+This is how most ML desktop tools ship.
+
+STEP A1️⃣ Install PyInstaller (inside venv)
+python -m pip install pyinstaller
+
+STEP A2️⃣ Modify main.py (IMPORTANT for EXE)
+
+We must make paths relative and EXE-safe.
+
+🔧 Replace your main.py with this
+import subprocess
+import sys
+import os
+
+def get_base_path():
+    # Works both in dev and packaged exe
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+BASE_PATH = get_base_path()
+PYTHON = sys.executable
+
+def run_script(script_name):
+    script_path = os.path.join(BASE_PATH, script_name)
+    subprocess.run([PYTHON, script_path], check=True)
+
+print("=== OFFLINE MEETING SUMMARIZER ===")
+
+print("\n[1/2] Transcribing audio...")
+run_script("transcribe.py")
+
+print("\n[2/2] Summarizing transcript...")
+run_script("summarize.py")
+
+print("\nDONE.")
+print("Check the output folder.")
+
+STEP A3️⃣ Build the executable
+
+Run from project root:
+
+pyinstaller --onedir --noconsole main.py
+
+
+After this finishes, you’ll get:
+
+dist/
+ └── main/
+     ├── main.exe
+     ├── _internal/
+     ├── torch/
+     ├── transformers/
+     └── ...
+
+
+✅ This folder is portable
+
+You can:
+
+Copy dist/main/ to another PC
+
+Double-click main.exe
+
+It will run
+
+STEP A4️⃣ Make models portable (CRITICAL)
+
+By default, models live here:
+
+C:\Users\<user>\.cache\huggingface\
+
+
+That is NOT portable.
+
+🔧 Fix: bundle models locally
+
+Add this once (recommended):
+
+setx HF_HOME "%CD%\models"
+
+
+Then:
+
+Run your program once
+
+Models download into models/
+
+Copy models/ along with dist/main/
+
+📦 Final portable package:
+
+MeetingSummarizer/
+ ├── main.exe
+ ├── models/
+ ├── audio/
+ └── output/
+
+
+This will run fully offline on any PC.
