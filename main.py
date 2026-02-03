@@ -1,15 +1,27 @@
 import subprocess
 import sys
+import os
 
-PYTHON = sys.executable  # THIS IS THE FIX
+def base_path():
+    if getattr(sys, "frozen", False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+BASE = base_path()
+PYTHON = sys.executable  # ALWAYS use current interpreter
+
+def run(script):
+    subprocess.run(
+        [PYTHON, os.path.join(BASE, script)],
+        check=True
+    )
 
 print("=== OFFLINE MEETING SUMMARIZER ===")
 
-print("\n[1/2] Transcribing audio...")
-subprocess.run([PYTHON, "transcribe.py"], check=True)
+print("[1/2] Transcribing audio...")
+run("transcribe.py")
 
-print("\n[2/2] Summarizing transcript...")
-subprocess.run([PYTHON, "summarize.py"], check=True)
+print("[2/2] Summarizing transcript...")
+run("summarize.py")
 
-print("\nDONE.")
-print("Check the output folder.")
+print("DONE")

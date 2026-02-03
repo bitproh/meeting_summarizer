@@ -15,6 +15,22 @@ def chunk_text(text, max_words=350):
     for i in range(0, len(words), max_words):
         yield " ".join(words[i:i + max_words])
 
+def normalize_to_bullets(text):
+    """
+    Forces clean bullet points:
+    - One idea per line
+    - Each line starts with '- '
+    """
+    lines = text.replace("•", "\n").replace("-", "\n").split("\n")
+    bullets = []
+
+    for line in lines:
+        line = line.strip()
+        if len(line) > 5:
+            bullets.append("- " + line)
+
+    return bullets
+
 def main():
     os.makedirs("output", exist_ok=True)
 
@@ -22,16 +38,15 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
-    model.eval()  # inference mode
+    model.eval()
 
     with open(INPUT_FILE, "r", encoding="utf-8") as f:
         text = f.read()
 
     chunks = list(chunk_text(text))
+    all_bullets = []
 
     print("\nSummarizing transcript...\n")
-
-    summaries = []
 
     progress_bar = tqdm(
         total=len(chunks),
@@ -41,9 +56,8 @@ def main():
     )
 
     for chunk in chunks:
-        # 🔹 Prompt conditioning for bullet points
         prompt = (
-            "Summarize the following meeting discussion into clear bullet points:\n\n"
+            "Summarize the following meeting into concise bullet points:\n\n"
             + chunk
         )
 
@@ -55,38 +69,29 @@ def main():
         )
 
         with torch.no_grad():
-            summary_ids = model.generate(
+            output_ids = model.generate(
                 inputs["input_ids"],
-                max_length=150,
+                max_length=160,
                 min_length=60,
                 num_beams=4,
                 length_penalty=2.0,
                 early_stopping=True
             )
 
-        summary_text = tokenizer.decode(
-            summary_ids[0],
+        raw_summary = tokenizer.decode(
+            output_ids[0],
             skip_special_tokens=True
         )
 
-        summaries.append(summary_text)
+        bullets = normalize_to_bullets(raw_summary)
+        all_bullets.extend(bullets)
+
         progress_bar.update(1)
 
     progress_bar.close()
 
-    # 🔹 Clean formatting into bullets
-    final_summary = []
-    for s in summaries:
-        lines = s.replace("•", "\n- ").replace("-", "\n- ").split("\n")
-        for line in lines:
-            line = line.strip()
-            if line:
-                if not line.startswith("-"):
-                    line = "- " + line
-                final_summary.append(line)
-
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        f.write("\n".join(final_summary))
+        f.write("\n".join(all_bullets))
 
     print("\nSummarization completed successfully.")
     print(f"Bullet-point summary saved to: {OUTPUT_FILE}")
